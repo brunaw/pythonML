@@ -8,7 +8,7 @@ editor_options:
 ---
 
 
-```{python, engine.path = '/anaconda3/bin/python3'}
+```{python, engine.path = '/Users/brunawundervald/anaconda3/bin/python3'}
 # Packages and models import
 from sklearn.model_selection import train_test_split
 from sklearn import linear_model
@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 ```
 
 
-```{python, engine.path = '/anaconda3/bin/python3'}
+```{python, engine.path = '/Users/brunawundervald/anaconda3/bin/python3'}
 # Reading & manipulating data 
 
 # Step 1: deal with JSON data 
@@ -58,11 +58,11 @@ def json_read():
     return df 
 
 da = json_read()
+# da.to_csv("logrevenue.csv", sep='\t')
 samp = da.sample(10000)
 ```
 
-
-```{python, engine.path = '/anaconda3/bin/python3', results = 'hide'}
+```{python, engine.path = '/Users/brunawundervald/anaconda3/bin/python3', results = 'hide'}
 # Dependent variable plot
 samp['totals.transactionRevenue'] = samp['totals.transactionRevenue'].astype(float)
 log_revenue = np.log(samp[samp['totals.transactionRevenue'] > 0]["totals.transactionRevenue"] + 0.01)
@@ -77,14 +77,14 @@ plt.show() # show plot
 
 
 
-```{python, engine.path = '/anaconda3/bin/python3', message = FALSE, results = 'hide'}
+```{python, engine.path = '/Users/brunawundervald/anaconda3/bin/python3', message = FALSE, results = 'hide'}
 # Selecting predictor variables!
 
 # Dimensions of sample
 samp.shape
 samp.fillna(0, inplace = True)
 
-# Selecting independent variables
+# Selecting the independent variables ----------------------------------
 X = samp[['socialEngagementType', 'device.isMobile', 'device.browser', 'totals.pageviews', 'totals.hits', 'geoNetwork.country', 'totals.newVisits', 'trafficSource.source', 'trafficSource.adwordsClickInfo.adNetworkType', 'totals.bounces', 'device.operatingSystem']]
 y = np.log(samp[['totals.transactionRevenue']] + 0.01)
 
@@ -106,19 +106,32 @@ X.iloc[0] # All ok
 # Train and test split (automatic function)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=4)
 
-# Setting the model
-model = linear_model.LinearRegression()
+# Setting the model(s)
+model_lm = linear_model.LinearRegression()
+model_lm.fit(X_train, y_train)
 
-model.fit(X_train, y_train)
 
 # Model coefficients 
-model.coef_
+model_lm.coef_
 
-y_pred = model.predict(X_test)
+model_rf = RandomForestRegressor()
+model_rf.fit(X_train, y_train)
 
-print("Mean squared error: %.2f"
-      % mean_squared_error(y_test, y_pred))
 
-# Explained variance score: 1 is perfect prediction
-print('Variance score: %.2f' % r2_score(y_test, y_pred))
+
+# Predictions
+y_pred_lm = model_lm.predict(X_test)
+y_pred_rf = model_rf.predict(X_test)
 ```
+
+```{python, engine.path = '/Users/brunawundervald/anaconda3/bin/python3'}
+print("LM - Mean squared error: %.2f"
+      % mean_squared_error(y_test, y_pred_lm))
+
+
+print("LM - Mean squared error: %.2f"
+      % mean_squared_error(y_test, y_pred_rf))
+
+```
+
+
