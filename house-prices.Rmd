@@ -21,8 +21,94 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt 
 import seaborn as sns
+import scipy.stats as stats
 ```
 
+
+## Data fields
+Here's a brief version of what you'll find in the data description file.
+
+
+  - SalePrice - the property's sale price in dollars (target variable).
+  - MSSubClass: The building class
+  - MSZoning: The general zoning classification
+  - LotFrontage: Linear feet of street connected to property
+  - LotArea: Lot size in square feet
+  - Street: Type of road access
+  - Alley: Type of alley access
+  - LotShape: General shape of property
+  - LandContour: Flatness of the property
+  - Utilities: Type of utilities available
+  - LotConfig: Lot configuration
+  - LandSlope: Slope of property
+  - Neighborhood: Physical locations within Ames city limits
+  - Condition1: Proximity to main road or railroad
+  - Condition2: Proximity to main road or railroad (if a second is present)
+  - BldgType: Type of dwelling
+  - HouseStyle: Style of dwelling
+  - OverallQual: Overall material and finish quality
+  - OverallCond: Overall condition rating
+  - YearBuilt: Original construction date
+  - YearRemodAdd: Remodel date
+  - RoofStyle: Type of roof
+  - RoofMatl: Roof material
+  - Exterior1st: Exterior covering on house
+  - Exterior2nd: Exterior covering on house (if more than one material)
+  - MasVnrType: Masonry veneer type
+  - MasVnrArea: Masonry veneer area in square feet
+  - ExterQual: Exterior material quality
+  - ExterCond: Present condition of the material on the exterior
+  - Foundation: Type of foundation
+  - BsmtQual: Height of the basement
+  - BsmtCond: General condition of the basement
+  - BsmtExposure: Walkout or garden level basement walls
+  - BsmtFinType1: Quality of basement finished area
+  - BsmtFinSF1: Type 1 finished square feet
+  - BsmtFinType2: Quality of second finished area (if present)
+  - BsmtFinSF2: Type 2 finished square feet
+  - BsmtUnfSF: Unfinished square feet of basement area
+  - TotalBsmtSF: Total square feet of basement area
+  - Heating: Type of heating
+  - HeatingQC: Heating quality and condition
+  - CentralAir: Central air conditioning
+  - Electrical: Electrical system
+  - 1stFlrSF: First Floor square feet
+  - 2ndFlrSF: Second floor square feet
+  - LowQualFinSF: Low quality finished square feet (all floors)
+  - GrLivArea: Above grade (ground) living area square feet
+  - BsmtFullBath: Basement full bathrooms
+  - BsmtHalfBath: Basement half bathrooms
+  - FullBath: Full bathrooms above grade
+  - HalfBath: Half baths above grade
+  - Bedroom: Number of bedrooms above basement level
+  - Kitchen: Number of kitchens
+  - KitchenQual: Kitchen quality
+  - TotRmsAbvGrd: Total rooms above grade (does not include bathrooms)
+  - Functional: Home functionality rating
+  - Fireplaces: Number of fireplaces
+  - FireplaceQu: Fireplace quality
+  - GarageType: Garage location
+  - GarageYrBlt: Year garage was built
+  - GarageFinish: Interior finish of the garage
+  - GarageCars: Size of garage in car capacity
+  - GarageArea: Size of garage in square feet
+  - GarageQual: Garage quality
+  - GarageCond: Garage condition
+  - PavedDrive: Paved driveway
+  - WoodDeckSF: Wood deck area in square feet
+  - OpenPorchSF: Open porch area in square feet
+  - EnclosedPorch: Enclosed porch area in square feet
+  - 3SsnPorch: Three season porch area in square feet
+  - ScreenPorch: Screen porch area in square feet
+  - PoolArea: Pool area in square feet
+  - PoolQC: Pool quality
+  - Fence: Fence quality
+  - MiscFeature: Miscellaneous feature not covered in other categories
+  - MiscVal: $Value of miscellaneous feature
+  - MoSold: Month Sold
+  - YrSold: Year Sold
+  - SaleType: Type of sale
+  - SaleCondition: Condition of sale
 
 ```{python, engine.path = '/Users/brunawundervald/anaconda3/bin/python3'}
 # Reading data
@@ -34,23 +120,45 @@ da.fillna(0, inplace = True)
 da.shape
 ```
 
+The plots above show the density of the response variable and the dentsity
+of its log transformation. Logarithmically transforming variables in a
+regression model is a very convenient way of transforming a highly 
+skewed variable (usually the response) into one that is more approximately 
+Normal. When we look at the plots, is easy to see that the original
+variable is skewed, as it has some very high values, seeing that we are
+dealing with house prices. Comparing with the transformed variable, 
+we can now see that this one looks way closer to a Normal distribution, 
+what justifies the transformation. 
+
+
+```{python, engine.path = '/Users/brunawundervald/anaconda3/bin/python3', results='hide'}
+# Density plot of y  and y in log scale -----------------------------------
+plt.clf() # clean plot environment x
+plt.figure(1)
+plt.figure(figsize = (14, 10))
+
+plt.subplot(211)
+sns.distplot(da['SalePrice'], bins = 30, kde = True, color = 'tomato', rug = True)
+plt.xlabel('Price', fontsize = 17)
+plt.ylabel('Histogram and density', fontsize = 17)
+
+plt.subplot(212)
+sns.distplot(np.log(da['SalePrice']), bins = 30, kde = True, color = 'tomato', rug = True)
+plt.xlabel('Price Log', fontsize = 17)
+plt.ylabel('Histogram and density', fontsize = 17)
+plt.show()
+```
+
 
 ```{python, engine.path = '/Users/brunawundervald/anaconda3/bin/python3'}
 # Converting factor variables
-# Selecting interesting variables
+# Selecting covariates
 X = da.drop('SalePrice', axis = 1)
 y = da['SalePrice']
 y = np.log(y)
 
-# Density plot of y in log scale -----------------------------------
-plt.clf() # clean plot environment 
-plt.figure(figsize = (14, 10))
-sns.distplot(y, bins = 30, kde = True, color = 'tomato', rug = True)
-plt.xlabel('Price Log', fontsize = 17)
-plt.ylabel('Histogram and density', fontsize = 17)
-plt.show()
-
 # Converting factors to dummies ------------------------------------
+# Function of conversion
 def dummy(var):
   X[var] = X[var].astype('category')
   X[var] = X[var].cat.codes
@@ -64,40 +172,75 @@ for index in range(0, len(columns)):
   else:
     X = X
     
-X.dtypes # All ok
+X.dtypes # All ok, no factors
 
 # Train and test split (automatic function)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=4)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 4)
 
+# Fitting the model(s)
+# ---------------------------
+# 1. Linear regression
+# 2. Random forests
+# 3. SVM
+# ---------------------------
 
-# Setting the model(s)
-# ------------------------
-# Linear regression
-# Random forests
-# SVM
-# ------------------------
+# 1. Linear regression
 model_lm = linear_model.LinearRegression()
 model_lm.fit(X_train, y_train)
 
+# Predictions and z-values
+y_pred_lm = model_lm.predict(X_test)
+z_lm = (y_test - y_pred_lm)/np.std(y_test)
+
+# 2. Random forests
 model_rf = RandomForestRegressor()
 model_rf.fit(X_train, y_train)
 
+# Predictions and z-values
+y_pred_rf = model_rf.predict(X_test)
+z_rf = (y_test - y_pred_rf)/np.std(y_test)
 
+# 3. SVM
 model_svm = SVR()
 model_svm.fit(X_train, y_train)
 
-# Predictions
-y_pred_lm = model_lm.predict(X_test)
-y_pred_rf = model_rf.predict(X_test)
+# Predictions and z-values
 y_pred_svm = model_svm.predict(X_test)
+z_svm = (y_test - y_pred_svm)/np.std(y_test)
 
-# LM - Mean squared error: 
-mean_squared_error(y_test, y_pred_lm)
-
-# RF - Mean squared error: 
-mean_squared_error(y_test, y_pred_rf)
-
-# SVM - Mean squared error: 
-mean_squared_error(y_test, y_pred_svm)
+# Mean squared error, our prediction measure
+print('LM:', round(mean_squared_error(y_test, y_pred_lm), 4))
+print('RF:', round(mean_squared_error(y_test, y_pred_rf), 4))
+print('SVM:', round(mean_squared_error(y_test, y_pred_svm), 4))
 ```
+
+
+```{python, engine.path = '/Users/brunawundervald/anaconda3/bin/python3', results='hide'}
+# Quantile-quantile plots ---------------------------------------------------------
+# If both sets of quantiles came from the same distribution, we should see the 
+# points forming a line that’s roughly straight
+plt.clf()
+plt.figure(1)
+plt.subplot(221)
+stats.probplot(z_lm, dist="norm", plot=plt)
+plt.title("Normal Q-Q plot - LM")
+plt.subplot(222)
+stats.probplot(z_rf, dist="norm", plot=plt)
+plt.title("Normal Q-Q plot - RF")
+
+plt.subplot(223)
+stats.probplot(z_svm, dist="norm", plot=plt)
+plt.title("Normal Q-Q plot - SVM")
+plt.show()
+```
+
+# Conclusions 
+
+The linear regression model produced the smallest mean squared error, 
+which indicates that it is predicting the response variable better than
+the other models. When looking at the Q-Q Plots, we can see that
+its residuals have the smallest magnitude, what shows that the predicted
+values are really closer to the reality. The plots also show
+that the linear regression model was not so influenced by the outliers
+as the Random Forest and the SVM. 
 
