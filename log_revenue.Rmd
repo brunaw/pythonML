@@ -13,12 +13,18 @@ editor_options:
 from sklearn.model_selection import train_test_split
 from sklearn import linear_model
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.neural_network import MLPRegressor
+from sklearn.preprocessing import StandardScaler  
+from sklearn.metrics import mean_squared_error
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import f_regression
+
+
 import csv
 import pandas as pd
 import numpy as np
 import json
-
+from pandas.api.types import is_object_dtype
 import random
 import seaborn as sns
 from pandas.io.json import json_normalize 
@@ -35,7 +41,7 @@ import matplotlib.pyplot as plt
 columns = ['device', 'geoNetwork', 'totals', 'trafficSource'] 
 
 def json_read():
-    data_frame =  'data/all/train.csv'
+    data_frame =  'data/rstudio/train.csv'
     
     #Importing the dataset
     df = pd.read_csv(data_frame, 
@@ -59,12 +65,15 @@ def json_read():
 
 da = json_read()
 # da.to_csv("logrevenue.csv", sep='\t')
+
+# Using a sample to make it faster
 samp = da.sample(10000)
 ```
 
 ```{python, engine.path = '/Users/brunawundervald/anaconda3/bin/python3', results = 'hide'}
-# Dependent variable plot
+# Response variable plot
 samp['totals.transactionRevenue'] = samp['totals.transactionRevenue'].astype(float)
+
 log_revenue = np.log(samp[samp['totals.transactionRevenue'] > 0]["totals.transactionRevenue"] + 0.01)
 
 plt.clf() # clean plot environment 
@@ -78,15 +87,19 @@ plt.show() # show plot
 
 
 ```{python, engine.path = '/Users/brunawundervald/anaconda3/bin/python3', message = FALSE, results = 'hide'}
-# Selecting predictor variables!
-
 # Dimensions of sample
 samp.shape
+
+# Filling NaNs
 samp.fillna(0, inplace = True)
 
-# Selecting the independent variables ----------------------------------
-X = samp[['socialEngagementType', 'device.isMobile', 'device.browser', 'totals.pageviews', 'totals.hits', 'geoNetwork.country', 'totals.newVisits', 'trafficSource.source', 'trafficSource.adwordsClickInfo.adNetworkType', 'totals.bounces', 'device.operatingSystem']]
+# Selecting the covariables ----------------------------------
+# X = samp[['socialEngagementType', 'device.isMobile', 'device.browser', 'totals.pageviews', 'totals.hits', 'geoNetwork.country', 'totals.newVisits', 'trafficSource.source', 'trafficSource.adwordsClickInfo.adNetworkType', 'totals.bounces', 'device.operatingSystem']]
+
 y = np.log(samp[['totals.transactionRevenue']] + 0.01)
+
+
+X = samp.drop(['totals.transactionRevenue'], axis = 1)
 
 # Defining function to convert variables in dummies
 def dummy(var):
@@ -94,44 +107,74 @@ def dummy(var):
     X[var] = X[var].cat.codes
     return X
 
-X = dummy('socialEngagementType')
-X = dummy('device.browser')
-X = dummy('geoNetwork.country')
-X = dummy('trafficSource.source')
-X = dummy('device.operatingSystem')
-X = dummy('trafficSource.adwordsClickInfo.adNetworkType')
+
+columns = X.columns
+
+for index in range(0, len(columns)):
+  if is_object_dtype(X[columns[index]]) == True:
+    X = dummy(columns[index])
+  else:
+    X = X
 
 X.iloc[0] # All ok
 
+X.shape
+
+# Selecting the 10 best features based on univariate statistical tests
+X_new = SelectKBest(f_regression, k = 10).fit_transform(X, y)
+
 # Train and test split (automatic function)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=4)
+X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size=0.3, random_state=4)
 
 # Setting the model(s)
+# -----------------------------
+# 1. Linear Regression
+# 2. Random Forests
+# 3. Neural Networks
+# --------------------------------
+
+# 1. Linear Regression
 model_lm = linear_model.LinearRegression()
 model_lm.fit(X_train, y_train)
 
-
-# Model coefficients 
-model_lm.coef_
-
+# 2. Random Forests
 model_rf = RandomForestRegressor()
 model_rf.fit(X_train, y_train)
 
+# 3. Neural Networks
+# Scaling data for the NN
+scaler = StandardScaler()  
+scaler.fit(X_train)  
+X_train_nn = scaler.transform(X_train)  
+X_test_nn = scaler.transform(X_test)  
 
+model_nn = MLPRegressor()
+model_nn.fit(X_train_nn, y_train)
 
 # Predictions
 y_pred_lm = model_lm.predict(X_test)
 y_pred_rf = model_rf.predict(X_test)
+y_pred_nn = model_nn.predict(X_test_nn)
 ```
 
 ```{python, engine.path = '/Users/brunawundervald/anaconda3/bin/python3'}
+# MSE results
 print("LM - Mean squared error: %.2f"
       % mean_squared_error(y_test, y_pred_lm))
 
-
-print("LM - Mean squared error: %.2f"
+print("RF - Mean squared error: %.2f"
       % mean_squared_error(y_test, y_pred_rf))
-
+      
+print("NN - Mean squared error: %.2f"
+      % mean_squared_error(y_test, y_pred_nn))
 ```
 
 
+# Some conclusions
+
+The linear regression and neural network models are predicting
+better than the rnadom forests when we use the 10 best
+predictor variables. Even so, we should always consider that
+linear regression requires less computational effort than that
+of the neural networks, so, in the case their predictions are
+similar, we can opt for the first one. 
